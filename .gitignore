@@ -1,0 +1,16 @@
+.idea
+.gradle/
+bin/
+target/
+build/
+*.obj
+*.iml
+doc/
+.project
+.classpath
+*/.classpath
+.settings
+build.bat
+*.sse
+*.class
+*.log
