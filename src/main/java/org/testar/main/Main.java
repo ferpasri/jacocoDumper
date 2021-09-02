@@ -1,68 +1,134 @@
 package org.testar.main;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.File;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import org.testar.main.jacoco.JacocoReportReader;
 import org.testar.main.jacoco.MBeanClient;
 
 public class Main {
 
 	public static void main(String[] args) {
-		// Maybe I dont need processPid if we hardcode jacoco jmx port to be 5000
-		// -Dcom.sun.management.jmxremote.port=5000
 
-		// Check that process pid exists
-		// TODO: Change to process name or get the pid from the apache java process
-		int processPid = Integer.parseInt(args[0]);
+		System.out.println("Welcome to jacocoDumper application");
 
-		// Check that seconds are between valid range ( 2 < x < 10) maybe
-		int milisecondsExtract = Integer.parseInt(args[1]);
-
-		while(isProcessIdRunningOnWindows(processPid)) {
-			// Dump the jacoco report with the current timestamp
-			MBeanClient.dumpJacocoReport();
-			
+		// Wait 1 second until the web server is deployed
+		while(!localhostWebIsReady()) {
+			System.out.println("Waiting for a web service in localhost:8080 ...");
 			try {
-				Thread.sleep(milisecondsExtract);
+				Thread.sleep(5000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
 
+		ExecutorService executor = Executors.newFixedThreadPool(10);
+
+		// Web server is ready, now we want to extract the coverage every 5 seconds
+		while(localhostWebIsReady()) {
+
+			// Launch a thread that dumps the jacoco report with the current timestamp
+			executor.submit(() -> {
+				// Prepare the current time stamp
+				String timeStamp = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
+
+				try {
+					// Extract jacoco.exec file 2021_09_02_11_02_47_jacoco.exec
+					String jacocoExecFile = MBeanClient.dumpJacocoReportWithTimestamp(timeStamp);
+					String reportDir = new File("report_" + timeStamp).getCanonicalPath();
+
+					// Using "HTML destdir" inside build.xml -> Creates the directory automatically
+					// But using only "CSV destfile" needs to create this directory first
+					if(!new File(reportDir).exists()) {
+						new File(reportDir).mkdirs();
+					}
+
+					// Launch jacoco report (build.xml) and overwrite desired parameters
+					String antCommand = "cd jacoco && ant report"
+							+ " -DjacocoFile=" + new File(jacocoExecFile).getCanonicalPath()
+							+ " -DreportCoverageDir=" + reportDir;
+
+					ProcessBuilder builder = new ProcessBuilder("cmd.exe", "/c", antCommand);
+					Process p = builder.start();
+					p.waitFor();
+
+					if(!new File(reportDir + File.separator + "report_jacoco.csv").exists()) {
+						System.out.println("************************************************");
+						System.out.println("ERROR creating JaCoCo report");
+						System.out.println("Check: If ant library is installed in the system");
+						System.out.println("Command Line: ant -version");
+						System.out.println("************************************************");
+					}
+
+					String coverage = JacocoReportReader.obtainCSVSummary(new File(reportDir + File.separator + "report_jacoco.csv").getCanonicalFile());
+					String information = "Time | " + timeStamp + " | " + coverage;
+					System.out.println(information);
+					Writer.writeMetrics(new WriterParams.WriterParamsBuilder()
+							.setFilename("webCoverageMetrics")
+							.setInformation(information)
+							.build());
+
+				} catch (IOException | InterruptedException e) {
+					System.err.println("ERROR creating JaCoCo coverage report");
+					e.printStackTrace();
+				}
+
+			});
+
+			// Wait 5 seconds for the next coverage
+			try {
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+
+		System.out.println("Shutting down dumper threads...");
+
+		executor.shutdown();
+		try {
+			executor.awaitTermination(20, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		System.out.println("Bye Bye jacocoDumper");
 	}
 
 	/**
-	 * https://stackoverflow.com/a/18004153
+	 * Check if Apache Tomcat localhost web server is ready to access. 
 	 * 
-	 * @param pid
 	 * @return
 	 */
-	public static boolean isProcessIdRunningOnWindows(int pid){
+	public static boolean localhostWebIsReady() {
 		try {
-			Runtime runtime = Runtime.getRuntime();
-			String cmds[] = {"cmd", "/c", "tasklist /FI \"PID eq " + pid + "\""};
-			Process proc = runtime.exec(cmds);
+			// Try to connect to the localhost apache tomcat web server
+			URL url = new URL("http://localhost:8080");
+			HttpURLConnection httpConnection = (HttpURLConnection) url.openConnection();
+			httpConnection.setRequestMethod("GET");
+			httpConnection.connect();
 
-			InputStream inputstream = proc.getInputStream();
-			InputStreamReader inputstreamreader = new InputStreamReader(inputstream);
-			BufferedReader bufferedreader = new BufferedReader(inputstreamreader);
-			String line;
-			while ((line = bufferedreader.readLine()) != null) {
-				//Search the PID matched lines single line for the sequence: " 1300 "
-				//if you find it, then the PID is still running.
-				if (line.contains(" " + pid + " ")){
-					return true;
-				}
+			// If we have get connection with the web app, everything is ready
+			if(httpConnection.getResponseCode() == 200) {
+				httpConnection.disconnect();
+				return true;
+			} 
+			// If not, server is probably being deployed
+			else {
+				httpConnection.disconnect();
+				return false;
 			}
-
-			return false;
-		} catch (Exception ex) {
-			ex.printStackTrace();
-			System.out.println("Cannot query the tasklist for some reason.");
-			System.exit(0);
+		} 
+		catch (Exception e) { 
+			System.out.println("*** http://localhost:8080 is NOT ready ***");
 		}
-
 		return false;
 	}
 }

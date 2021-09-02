@@ -20,9 +20,6 @@ package org.testar.main.jacoco;
 
 
 import java.io.FileOutputStream;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
 import javax.management.MBeanServerConnection;
 import javax.management.MBeanServerInvocationHandler;
 import javax.management.ObjectName;
@@ -56,10 +53,9 @@ public final class MBeanClient {
 
 		void reset();
 	}
-	
-	public static String dumpJacocoReport() {
-		String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
-		return dumpJaCoCoReport(timeStamp + "_jacoco.exec");
+
+	public static String dumpJacocoReportWithTimestamp(String timeStamp) {
+		return dumpJacocoReport(timeStamp + "_jacoco.exec");
 	}
 
 	/**
@@ -71,7 +67,7 @@ public final class MBeanClient {
 	 * @throws Exception
 	 * @return string that contains extracted jacoco.exec file
 	 */
-	private static String dumpJaCoCoReport(String destFile) {
+	private static String dumpJacocoReport(String destFile) {
 		try {
 			// Open connection to the coverage agent:
 			final JMXServiceURL url = new JMXServiceURL(SERVICE_URL);
@@ -85,8 +81,8 @@ public final class MBeanClient {
 							false);
 
 			// Retrieve JaCoCo version and session id:
-			System.out.println("Version: " + proxy.getVersion());
-			System.out.println("Session: " + proxy.getSessionId());
+			//System.out.println("Version: " + proxy.getVersion());
+			//System.out.println("Session: " + proxy.getSessionId());
 
 			// Retrieve dump and write to file:
 			final byte[] data = proxy.getExecutionData(false);
@@ -105,6 +101,7 @@ public final class MBeanClient {
 			return "";
 		}
 
+		System.out.println("MBeanClient extracted: " + destFile);
 		return destFile;
 	}
 }
