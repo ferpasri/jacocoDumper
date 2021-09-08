@@ -13,13 +13,17 @@ import java.util.concurrent.TimeUnit;
 import org.testar.main.jacoco.JacocoReportReader;
 import org.testar.main.jacoco.MBeanClient;
 
+import com.google.common.io.Files;
+
 public class Main {
+
+	private static String metricsFilename = "webCoverageMetrics";
 
 	public static void main(String[] args) {
 
 		System.out.println("Welcome to jacocoDumper application");
 
-		// Wait 1 second until the web server is deployed
+		// Wait 5 second until the web server is deployed
 		while(!localhostWebIsReady()) {
 			System.out.println("Waiting for a web service in localhost:8080 ...");
 			try {
@@ -29,6 +33,10 @@ public class Main {
 			}
 		}
 
+		// Add the dumper execution timestamp to the metrics filename
+		String metricsFileTimestamp = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
+		metricsFilename = metricsFilename.concat("_" + metricsFileTimestamp);	
+
 		ExecutorService executor = Executors.newFixedThreadPool(10);
 
 		// Web server is ready, now we want to extract the coverage every 5 seconds
@@ -36,13 +44,13 @@ public class Main {
 
 			// Launch a thread that dumps the jacoco report with the current timestamp
 			executor.submit(() -> {
-				// Prepare the current time stamp
+				// Prepare the current thread time stamp
 				String timeStamp = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
 
 				try {
 					// Extract jacoco.exec file 2021_09_02_11_02_47_jacoco.exec
 					String jacocoExecFile = MBeanClient.dumpJacocoReportWithTimestamp(timeStamp);
-					String reportDir = new File("report_" + timeStamp).getCanonicalPath();
+					String reportDir = new File("reports" + File.separator + timeStamp).getCanonicalPath();
 
 					// Using "HTML destdir" inside build.xml -> Creates the directory automatically
 					// But using only "CSV destfile" needs to create this directory first
@@ -55,7 +63,12 @@ public class Main {
 							+ " -DjacocoFile=" + new File(jacocoExecFile).getCanonicalPath()
 							+ " -DreportCoverageDir=" + reportDir;
 
-					ProcessBuilder builder = new ProcessBuilder("cmd.exe", "/c", antCommand);
+					// Prepare process execution for linux or windows
+					ProcessBuilder builder = new ProcessBuilder("/bin/sh", "-c", antCommand);
+					if(System.getProperty("os.name").toLowerCase().contains("windows")) {
+						builder = new ProcessBuilder("cmd.exe", "/c", antCommand);
+					}
+
 					Process p = builder.start();
 					p.waitFor();
 
@@ -71,9 +84,12 @@ public class Main {
 					String information = "Time | " + timeStamp + " | " + coverage;
 					System.out.println(information);
 					Writer.writeMetrics(new WriterParams.WriterParamsBuilder()
-							.setFilename("webCoverageMetrics")
+							.setFilename(metricsFilename)
 							.setInformation(information)
 							.build());
+
+					// Move the jacoco.exec file
+					Files.move(new File(jacocoExecFile), new File(reportDir + File.separator + jacocoExecFile));
 
 				} catch (IOException | InterruptedException e) {
 					System.err.println("ERROR creating JaCoCo coverage report");
