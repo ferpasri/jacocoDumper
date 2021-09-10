@@ -12,12 +12,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.testar.main.jacoco.JacocoReportReader;
 import org.testar.main.jacoco.MBeanClient;
+import org.testar.main.statemodel.StateModelMetrics;
 
 import com.google.common.io.Files;
 
 public class Main {
 
 	private static String metricsFilename = "webCoverageMetrics";
+	private static String statemodelFilename = "stateModelMetrics";
 
 	public static void main(String[] args) {
 
@@ -34,8 +36,9 @@ public class Main {
 		}
 
 		// Add the dumper execution timestamp to the metrics filename
-		String metricsFileTimestamp = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
-		metricsFilename = metricsFilename.concat("_" + metricsFileTimestamp);	
+		String fileTimestamp = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date());
+		metricsFilename = metricsFilename.concat("_" + fileTimestamp);	
+		statemodelFilename = statemodelFilename.concat("_" + fileTimestamp);
 
 		ExecutorService executor = Executors.newFixedThreadPool(10);
 
@@ -81,18 +84,27 @@ public class Main {
 					}
 
 					String coverage = JacocoReportReader.obtainCSVSummary(new File(reportDir + File.separator + "report_jacoco.csv").getCanonicalFile());
-					String information = "Time | " + timeStamp + " | " + coverage;
-					System.out.println(information);
+					String coverageInformation = "Time | " + timeStamp + " | " + coverage;
+					System.out.println(coverageInformation);
 					Writer.writeMetrics(new WriterParams.WriterParamsBuilder()
 							.setFilename(metricsFilename)
-							.setInformation(information)
+							.setInformation(coverageInformation)
 							.build());
 
 					// Move the jacoco.exec file
 					Files.move(new File(jacocoExecFile), new File(reportDir + File.separator + jacocoExecFile));
 
+					// Query the OrientDB database and prepare the state model metrics
+					String statemodel = StateModelMetrics.extractStateModelMetrics();
+					String statemodelInformation = "Time | " + timeStamp + " | " + statemodel;
+					System.out.println(statemodelInformation);
+					Writer.writeMetrics(new WriterParams.WriterParamsBuilder()
+							.setFilename(statemodelFilename)
+							.setInformation(statemodelInformation)
+							.build());
+
 				} catch (IOException | InterruptedException e) {
-					System.err.println("ERROR creating JaCoCo coverage report");
+					System.err.println("ERROR creating metrics reports");
 					e.printStackTrace();
 				}
 
@@ -123,7 +135,7 @@ public class Main {
 	 * 
 	 * @return
 	 */
-	public static boolean localhostWebIsReady() {
+	private static boolean localhostWebIsReady() {
 		try {
 			// Try to connect to the localhost apache tomcat web server
 			URL url = new URL("http://localhost:8080");

@@ -15,6 +15,7 @@ dependencies {
     compile group: 'org.apache.maven', name: 'maven-core', version: '3.6.3'
     compile group: 'org.jacoco', name: 'jacoco-maven-plugin', version: '0.8.6'
     compile group: 'com.opencsv', name: 'opencsv', version: '5.3'
+    compile group: 'com.orientechnologies', name: 'orientdb-graphdb', version: '3.0.34'
 
     // Use JUnit test framework
     testImplementation 'junit:junit:4.12'
