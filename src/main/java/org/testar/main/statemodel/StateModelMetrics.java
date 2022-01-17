@@ -17,24 +17,23 @@ public class StateModelMetrics {
 	 * @return
 	 */
 	public static String extractStateModelMetrics() {
-		OrientDB orientDB;
-		ODatabaseSession db;
-		try {
-			orientDB = new OrientDB("remote:localhost/", "testar", "testar", OrientDBConfig.defaultConfig());
-			db = orientDB.open("testar", "testar", "testar");
+		OrientDB orientDB = new OrientDB("remote:localhost/", "testar", "testar", OrientDBConfig.defaultConfig());
+		String resultAbstractStates = "AbstractStates ERROR";
+		String resultAbstractActions = "AbstractActions ERROR";
+		String resultUnvisitedActions = "UnvisitedActions ERROR";
+		String resultConcreteStates = "ConcreteStates ERROR";
+		String resultConcreteActions = "ConcreteActions ERROR";
+		try (ODatabaseSession db = orientDB.open("testar", "testar", "testar")) {
+			resultAbstractStates = "AbstractStates " + queryStatement(db, "select count(*) from AbstractState");
+			resultAbstractActions = "AbstractActions " + queryStatement(db, "select count(*) from AbstractAction");
+			resultUnvisitedActions = "UnvisitedActions " + queryStatement(db, "select count(*) from UnvisitedAbstractAction");
+			resultConcreteStates = "ConcreteStates " + queryStatement(db, "select count(*) from ConcreteState");
+			resultConcreteActions = "ConcreteActions " + queryStatement(db, "select count(*) from ConcreteAction");
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "Auth error";
+		} finally {
+			orientDB.close();
 		}
-
-		String resultAbstractStates = "AbstractStates " + queryStatement(db, "select count(*) from AbstractState");
-		String resultAbstractActions = "AbstractActions " + queryStatement(db, "select count(*) from AbstractAction");
-		String resultUnvisitedActions = "UnvisitedActions " + queryStatement(db, "select count(*) from UnvisitedAbstractAction");
-		String resultConcreteStates = "ConcreteStates " + queryStatement(db, "select count(*) from ConcreteState");
-		String resultConcreteActions = "ConcreteActions " + queryStatement(db, "select count(*) from ConcreteAction");
-
-		db.close();
-		orientDB.close();
 
 		// Prepare and write the state model metrics information
 		return (resultAbstractStates +
