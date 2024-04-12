@@ -27,7 +27,7 @@ public class Main {
 
 		// Wait 5 second until the web server is deployed
 		while(!localhostWebIsReady()) {
-			System.out.println("Waiting for a web service in localhost:8080 ...");
+			System.out.println("Waiting for a web service in localhost:8080/parabank ...");
 			try {
 				Thread.sleep(5000);
 			} catch (InterruptedException e) {
@@ -138,7 +138,7 @@ public class Main {
 	private static boolean localhostWebIsReady() {
 		try {
 			// Try to connect to the localhost apache tomcat web server
-			URL url = new URL("http://localhost:8080");
+			URL url = new URL("http://localhost:8080/parabank");
 			HttpURLConnection httpConnection = (HttpURLConnection) url.openConnection();
 			httpConnection.setRequestMethod("GET");
 			httpConnection.connect();
@@ -155,7 +155,7 @@ public class Main {
 			}
 		} 
 		catch (Exception e) { 
-			System.out.println("*** http://localhost:8080 is NOT ready ***");
+			System.out.println("*** http://localhost:8080/parabank is NOT ready ***");
 		}
 		return false;
 	}
